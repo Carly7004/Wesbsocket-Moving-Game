@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      #hangman {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="login-controls">
+      <label for="username">username</label>
+      <input id="username" />
+      <button id="connect">connect</button>
+    </form>
+
+    <div id="hangman">
+      <form id="guess-controls">
+        <label for="letter">Letter</label>
+        <input id="letter" type="text" />
+        <button id="guess">Guess</button>
+      </form>
+      <span id="guessed-word"></span>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+
+      const loginControls = document.getElementById("login-controls");
+      const hangman = document.getElementById("hangman");
+      const connectbtn = document.getElementById("connect");
+      const username = document.getElementById("username");
+      const guessForm = document.getElementById("guess-controls");
+      const letter = document.getElementById("letter");
+      const guessedWordDisplay = document.getElementById("guessed-word");
+
+      loginControls.addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (!username.value) return;
+        socket.emit("joined", username.value);
+        loginControls.style.display = "none";
+        hangman.style.display = "block";
+      });
+
+      guessForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (!letter.value || letter.value.length !== 1) return;
+        socket.emit("guess", letter.value);
+        letter.value = "";
+      });
+
+      socket.on("pong", (message) => {
+        console.log(message);
+      });
+
+      socket.on("guessedWord", (guessedWord) => {
+        guessedWordDisplay.innerText = guessedWord;
+      });
+    </script>
+  </body>
+</html>
