@@ -6,63 +6,121 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
     <style>
-      #hangman {
-        display: none;
+      .player {
+        position: absolute;
+        width: 30px;
+        height: 30px;
+      }
+
+      #board {
+        width: 500px;
+        height: 500px;
+        background: gray;
+      }
+
+      .name {
+        position: absolute;
+        top: -10px;
+        left: -5px;
+        font-size: 10px;
       }
     </style>
   </head>
   <body>
-    <form id="login-controls">
-      <label for="username">username</label>
-      <input id="username" />
-      <button id="connect">connect</button>
-    </form>
-
-    <div id="hangman">
-      <form id="guess-controls">
-        <label for="letter">Letter</label>
-        <input id="letter" type="text" />
-        <button id="guess">Guess</button>
-      </form>
-      <span id="guessed-word"></span>
-    </div>
+    <div id="board"></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
       const socket = io();
 
-      const loginControls = document.getElementById("login-controls");
-      const hangman = document.getElementById("hangman");
-      const connectbtn = document.getElementById("connect");
-      const username = document.getElementById("username");
-      const guessForm = document.getElementById("guess-controls");
-      const letter = document.getElementById("letter");
-      const guessedWordDisplay = document.getElementById("guessed-word");
+      const boardEl = document.getElementById("board");
 
-      loginControls.addEventListener("submit", (e) => {
-        e.preventDefault();
-        if (!username.value) return;
-        socket.emit("joined", username.value);
-        loginControls.style.display = "none";
-        hangman.style.display = "block";
+      let playersMap = {};
+      const keyDown = {
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+      };
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "d") {
+          keyDown["right"] = true;
+        }
+        if (e.key === "w") {
+          keyDown["up"] = true;
+        }
+        if (e.key === "a") {
+          keyDown["left"] = true;
+        }
+        if (e.key === "s") {
+          keyDown["down"] = true;
+        }
+        console.log(e.key);
       });
 
-      guessForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        if (!letter.value || letter.value.length !== 1) return;
-        socket.emit("guess", letter.value);
-        letter.value = "";
+      document.addEventListener("keyup", (e) => {
+        if (e.key === "d") {
+          keyDown["right"] = false;
+        }
+        if (e.key === "w") {
+          keyDown["up"] = false;
+        }
+        if (e.key === "a") {
+          keyDown["left"] = false;
+        }
+        if (e.key === "s") {
+          keyDown["down"] = false;
+        }
       });
 
-      socket.on("pong", (message) => {
-        console.log(message);
+      setInterval(() => {
+        if (keyDown["right"]) {
+          socket.emit("right");
+        }
+        if (keyDown["up"]) {
+          socket.emit("up");
+        }
+        if (keyDown["left"]) {
+          socket.emit("left");
+        }
+        if (keyDown["down"]) {
+          socket.emit("down");
+        }
+      }, 1000 / 30);
+
+      const getRamdomColor = () => Math.floor(255 * Math.random());
+
+      socket.on("players", (players) => {
+        try {
+          for (const player of players) {
+            if (!playersMap[player.id]) {
+              playersMap[player.id] = player;
+              const playerEl = document.createElement("div");
+              const nameEl = document.createElement("div");
+              playerEl.classList.add("player");
+              nameEl.classList.add("name");
+              boardEl.appendChild(playerEl);
+              playerEl.appendChild(nameEl);
+              nameEl.innerText = player.name;
+              player.el = playerEl;
+              player.el.style.background = `rgb(${getRamdomColor()}, ${getRamdomColor()}, ${getRamdomColor()} )`;
+              if (player.id === socket.id) {
+                player.el.style.border = "1px solid red";
+              }
+            }
+            playersMap[player.id].el.style.left = player.x + "px";
+            playersMap[player.id].el.style.top = player.y + "px";
+          }
+        } catch (error) {
+          console.log(error);
+        }
       });
 
-      socket.on("guessedWord", (guessedWord) => {
-        guessedWordDisplay.innerText = guessedWord
-          .split("")
-          .map((char, i) => `${char} `)
-          .join(" ");
+      socket.on("playerDisconnected", (playerId) => {
+        const player = playersMap[playerId];
+        delete playersMap[playerId];
+        player.el.remove();
       });
     </script>
   </body>

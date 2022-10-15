@@ -6,6 +6,7 @@ const { Server } = require("socket.io");
 const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 const dotenv = require("dotenv");
+const randomname = require("random-name");
 
 dotenv.config();
 
@@ -14,87 +15,44 @@ app.use(express.static("public"));
 //   res.sendFile(__dirname + '/index.html');
 // });
 
-const GUESSED_WORD_EVENT = "guessedWord";
-const GUESS_EVENT = "guess";
-const JOIN_EVENT = "joined";
+
 const CONNECTION_EVENT = "connection";
 
-const allWOrdsToGuess = [
-    "javascript",
-    "python",
-    "nextjs",
-    "react",
-    "nodejs",
-    "typescript",
-    "tailwind",
-    "css",
-    "html",
-    "express",
-    "fastify",
-    "redux",
-    "usestate",
-    "idontknow",
-]
-
-const users = {};
-
-let wordToGuess;
-let guessedWord;
-
-const setNextWord = () => {
-    const word = allWOrdsToGuess[parseInt(Math.random() * allWOrdsToGuess.length)]
-  wordToGuess = word;
-  guessedWord = wordToGuess.split("").fill("_");
-};
-setNextWord("dog");
-console.log(guessedWord);
-
-const getGuessedWord = () => {
-  return guessedWord.join("");
-};
-
-const emitGuessedWord = (channel) => {
-  channel.emit(GUESSED_WORD_EVENT, getGuessedWord());
-};
+let players = [];
 
 io.on(CONNECTION_EVENT, (socket) => {
+  const player = {
+    x: 0,
+    y: 0,
+    id: socket.id,
+    name: randomname.first()
+  };
+  players.push(player);
+
+  socket.on("right", () => {
+    player.x += 1;
+  });
+  socket.on("left", () => {
+    player.x -= 1;
+  });
+  socket.on("up", () => {
+    player.y -= 1;
+  });
+  socket.on("down", () => {
+    player.y += 1;
+  });
+
+  socket.on("disconnect", () => {
+    players = players.filter((player) => player.id !== socket.id);
+    io.emit("playerDisconnected", socket.id);
+  })
+
   console.log("a user connected");
-
-  emitGuessedWord(socket);
-
-  // geting user from the frontend/index.html
-  // and when user connect we keep track of their username
-  socket.on(JOIN_EVENT, (username) => {
-    users[socket.id] = {
-      username,
-    };
-    console.log(users);
-  });
-  // checking if user letter is the same was wordToGuess, and broadcast it to all users
-  socket.on(GUESS_EVENT, (letter) => {
-    let isCorrectGuess = false;
-    // using forEach method or for loop to check if letter is correct
-    [...wordToGuess].forEach((character, i) => {
-      if (character === letter) {
-        guessedWord[i] = character;
-        isCorrectGuess = true;
-      }
-    });
-    // for(let i = 0; i < wordToGuess.length; i++) {
-    //     const character = wordToGuess[i];
-    //     if(character === letter) {
-    //         placeholder[i] = letter;
-    //         isCorrectGuess = true;
-    //     }
-    // }
-    if (isCorrectGuess) {
-      if (!guessedWord.includes("_")) {
-        setNextWord();
-      }
-      emitGuessedWord(io);
-    }
-  });
 });
+// every new milisec broadcaste the current state of the board
+setInterval(() => {
+  io.emit("players", players);
+}, 1000 / 30);
 
 server.listen(PORT, () => {
   console.log(`listening on *:${PORT}`);
